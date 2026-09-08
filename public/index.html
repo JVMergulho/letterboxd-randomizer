@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Letterboxd Watchlist Randomizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            letterboxd: {
+              dark: '#14181c',
+              darker: '#0c0e10',
+              green: '#00e054',
+              orange: '#ff8000',
+              blue: '#00c0ff',
+              card: '#1c2228',
+              border: '#2c3440'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-letterboxd-darker text-gray-100 min-h-screen flex flex-col justify-between selection:bg-letterboxd-green selection:text-black">
+
+  <!-- Header -->
+  <header class="border-b border-letterboxd-border bg-letterboxd-dark/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-letterboxd-green text-letterboxd-darker font-black text-xl px-3 py-1 rounded shadow-lg transform -rotate-3">
+          <i class="fa-solid fa-film"></i>
+        </div>
+        <h1 class="text-xl font-bold tracking-wider uppercase text-white">
+          Letterboxd <span class="text-letterboxd-green">Randomizer</span>
+        </h1>
+      </div>
+      <div class="text-xs text-gray-400 hidden sm:block">
+        Sorteie filmes da sua Watchlist pública
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-4xl mx-auto px-4 py-10 flex-grow w-full flex flex-col items-center justify-center">
+
+    <!-- Search Box Card -->
+    <div class="bg-letterboxd-card border border-letterboxd-border rounded-xl p-6 sm:p-8 w-full max-w-xl shadow-2xl mb-8">
+      <h2 class="text-lg font-semibold mb-4 text-center text-gray-200">
+        Digite seu usuário do Letterboxd
+      </h2>
+      <form id="randomizer-form" class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-grow">
+          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+            <i class="fa-solid fa-user"></i>
+          </div>
+          <input 
+            type="text" 
+            id="username-input" 
+            placeholder="ex: jvmergulho" 
+            required
+            class="w-full pl-11 pr-4 py-3 bg-letterboxd-darker border border-letterboxd-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-letterboxd-green focus:ring-1 focus:ring-letterboxd-green transition-all"
+          >
+        </div>
+        <button 
+          type="submit" 
+          id="submit-btn"
+          class="bg-letterboxd-green hover:bg-[#00c84c] text-letterboxd-darker font-bold px-6 py-3 rounded-lg transition-all flex items-center justify-center space-x-2 shadow-lg hover:shadow-letterboxd-green/20 cursor-pointer"
+        >
+          <span id="btn-text">Sortear Filme</span>
+          <i id="btn-icon" class="fa-solid fa-dice"></i>
+        </button>
+      </form>
+      <div id="error-message" class="mt-4 p-3 bg-red-900/40 border border-red-700/60 rounded-lg text-red-300 text-sm hidden"></div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="hidden flex flex-col items-center justify-center py-12">
+      <div class="w-12 h-12 border-4 border-letterboxd-border border-t-letterboxd-green rounded-full animate-spin mb-4"></div>
+      <p class="text-gray-400 animate-pulse text-sm">Vasculhando a watchlist e sorteando...</p>
+    </div>
+
+    <!-- Result Card -->
+    <div id="result-card" class="hidden bg-letterboxd-card border border-letterboxd-border rounded-xl overflow-hidden shadow-2xl w-full max-w-2xl transform transition-all duration-300">
+      <div class="bg-gradient-to-r from-letterboxd-green/10 to-transparent p-4 border-b border-letterboxd-border flex justify-between items-center">
+        <span class="text-xs uppercase font-bold tracking-wider text-letterboxd-green flex items-center gap-2">
+          <i class="fa-solid fa-clapperboard"></i> Filme Sorteado!
+        </span>
+        <span id="watchlist-total" class="text-xs text-gray-400 bg-letterboxd-darker px-3 py-1 rounded-full border border-letterboxd-border">
+          Watchlist: 0 filmes
+        </span>
+      </div>
+
+      <div class="p-6 sm:p-8 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+        <!-- Poster -->
+        <div class="w-48 sm:w-56 flex-shrink-0 flex justify-center">
+          <img 
+            id="movie-poster" 
+            src="" 
+            alt="Pôster do Filme" 
+            class="rounded-lg shadow-xl border border-letterboxd-border object-cover w-full aspect-[2/3] bg-letterboxd-darker"
+          >
+        </div>
+
+        <!-- Info -->
+        <div class="flex-grow flex flex-col justify-between text-center sm:text-left">
+          <div>
+            <h3 id="movie-title" class="text-2xl font-bold text-white mb-2 leading-tight">Título do Filme</h3>
+            <p id="movie-director" class="text-sm text-gray-400 mb-3 hidden">
+              <i class="fa-solid fa-video mr-1 text-letterboxd-green"></i> <span id="director-text"></span>
+            </p>
+            <div id="movie-genres" class="flex flex-wrap justify-center sm:justify-start gap-1.5 mb-4 hidden">
+              <!-- Genres injected here -->
+            </div>
+            <p id="movie-description" class="text-gray-300 text-sm mb-6 leading-relaxed line-clamp-4">
+              Sinopse do filme...
+            </p>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3 pt-4 border-t border-letterboxd-border">
+            <a 
+              id="movie-link" 
+              href="#" 
+              target="_blank" 
+              class="flex-grow bg-letterboxd-border hover:bg-[#384454] text-white font-medium py-2.5 px-4 rounded-lg text-center transition-all flex items-center justify-center space-x-2 text-sm"
+            >
+              <i class="fa-solid fa-external-link-alt text-xs"></i>
+              <span>Ver no Letterboxd</span>
+            </a>
+            <button 
+              id="reroll-btn" 
+              class="bg-letterboxd-green hover:bg-[#00c84c] text-letterboxd-darker font-bold py-2.5 px-6 rounded-lg transition-all flex items-center justify-center space-x-2 text-sm cursor-pointer"
+            >
+              <i class="fa-solid fa-rotate"></i>
+              <span>Sortear Outro</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-letterboxd-border bg-letterboxd-dark/80 py-6 text-center text-xs text-gray-500">
+    <p>Letterboxd Watchlist Randomizer &bull; Feito com Node.js, Express e Tailwind CSS</p>
+  </footer>
+
+  <script>
+    const form = document.getElementById('randomizer-form');
+    const usernameInput = document.getElementById('username-input');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    const btnIcon = document.getElementById('btn-icon');
+    const errorMessage = document.getElementById('error-message');
+    const loadingState = document.getElementById('loading-state');
+    const resultCard = document.getElementById('result-card');
+
+    const moviePoster = document.getElementById('movie-poster');
+    const movieTitle = document.getElementById('movie-title');
+    const movieDirector = document.getElementById('movie-director');
+    const directorText = document.getElementById('director-text');
+    const movieGenres = document.getElementById('movie-genres');
+    const movieDescription = document.getElementById('movie-description');
+    const movieLink = document.getElementById('movie-link');
+    const watchlistTotal = document.getElementById('watchlist-total');
+    const rerollBtn = document.getElementById('reroll-btn');
+
+    async function fetchRandomMovie() {
+      const username = usernameInput.value.trim();
+      if (!username) return;
+
+      // Reset states
+      errorMessage.classList.add('hidden');
+      resultCard.classList.add('hidden');
+      loadingState.classList.remove('hidden');
+      submitBtn.disabled = true;
+      rerollBtn.disabled = true;
+      btnText.textContent = 'Sorteando...';
+      btnIcon.className = 'fa-solid fa-spinner fa-spin';
+
+      try {
+        const res = await fetch(`/api/random-movie?username=${encodeURIComponent(username)}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Erro ao buscar watchlist.');
+        }
+
+        const movie = data.movie;
+        watchlistTotal.textContent = `Watchlist: ${data.totalWatchlist} filmes`;
+        movieTitle.textContent = movie.title || 'Filme sem título';
+        movieLink.href = movie.link;
+
+        if (movie.poster) {
+          moviePoster.src = movie.poster;
+          moviePoster.classList.remove('hidden');
+        } else {
+          moviePoster.src = 'https://s.ltrbxd.com/static/img/empty-poster-1000-CR2Xn85D.png';
+        }
+
+        if (movie.director) {
+          directorText.textContent = movie.director;
+          movieDirector.classList.remove('hidden');
+        } else {
+          movieDirector.classList.add('hidden');
+        }
+
+        if (movie.genre && movie.genre.length > 0) {
+          movieGenres.innerHTML = movie.genre.map(g => 
+            `<span class="text-xs bg-letterboxd-darker text-gray-300 px-2.5 py-1 rounded border border-letterboxd-border">${g}</span>`
+          ).join('');
+          movieGenres.classList.remove('hidden');
+        } else {
+          movieGenres.classList.add('hidden');
+        }
+
+        if (movie.description) {
+          movieDescription.textContent = movie.description;
+          movieDescription.classList.remove('hidden');
+        } else {
+          movieDescription.textContent = 'Nenhuma sinopse disponível.';
+        }
+
+        resultCard.classList.remove('hidden');
+        resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      } catch (err) {
+        errorMessage.textContent = err.message;
+        errorMessage.classList.remove('hidden');
+      } finally {
+        loadingState.classList.add('hidden');
+        submitBtn.disabled = false;
+        rerollBtn.disabled = false;
+        btnText.textContent = 'Sortear Filme';
+        btnIcon.className = 'fa-solid fa-dice';
+      }
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      fetchRandomMovie();
+    });
+
+    rerollBtn.addEventListener('click', () => {
+      fetchRandomMovie();
+    });
+  </script>
+</body>
+</html>
