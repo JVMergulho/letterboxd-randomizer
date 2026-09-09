@@ -17,6 +17,110 @@ const letterboxdClient = axios.create({
   }
 });
 
+// Helper to fetch all watchlist films for a user across pagination
+async function fetchAllWatchlistFilms(username) {
+  const watchlistUrl = `https://letterboxd.com/${username}/watchlist/`;
+  let response;
+  try {
+    response = await letterboxdClient.get(watchlistUrl);
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      throw new Error(`Usuário '${username}' não encontrado ou watchlist privada.`);
+    }
+    throw new Error(`Falha ao buscar a watchlist de '${username}'.`);
+  }
+
+  const $ = cheerio.load(response.data);
+
+  const countText = $('.js-watchlist-count').text().trim();
+  let totalFilms = 0;
+  if (countText) {
+    const match = countText.replace(/,/g, '').match(/(\d+)/);
+    if (match) {
+      totalFilms = parseInt(match[1], 10);
+    }
+  }
+
+  const allFilms = new Map();
+
+  const extractFilmsFromHtml = (html) => {
+    const $p = cheerio.load(html);
+    $p('.poster-list li.griditem, li.griditem').each((_, el) => {
+      const comp = $p(el).find('.react-component[data-component-class="LazyPoster"]');
+      const itemName = comp.attr('data-item-name');
+      const itemSlug = comp.attr('data-item-slug');
+      const itemLink = comp.attr('data-item-link');
+      if (itemSlug && itemLink) {
+        allFilms.set(itemSlug, { name: itemName || itemSlug, slug: itemSlug, link: itemLink });
+      }
+    });
+  };
+
+  extractFilmsFromHtml(response.data);
+
+  const totalPages = totalFilms > 0 ? Math.ceil(totalFilms / 28) : Math.ceil(allFilms.size / 28);
+
+  if (totalPages > 1) {
+    const pagePromises = [];
+    for (let p = 2; p <= totalPages; p++) {
+      pagePromises.push(
+        letterboxdClient.get(`https://letterboxd.com/${username}/watchlist/page/${p}/`)
+          .then(res => extractFilmsFromHtml(res.data))
+          .catch(() => {})
+      );
+    }
+    await Promise.all(pagePromises);
+  }
+
+  return Array.from(allFilms.values());
+}
+
+// Helper to enrich movie details from its film page
+async function fetchFilmDetails(selectedFilm) {
+  const filmUrl = `https://letterboxd.com${selectedFilm.link}`;
+  let filmDetails = {
+    title: selectedFilm.name,
+    link: filmUrl,
+    poster: null,
+    description: null,
+    director: null,
+    genre: []
+  };
+
+  try {
+    const filmResponse = await letterboxdClient.get(filmUrl);
+    const $film = cheerio.load(filmResponse.data);
+
+    const jsonLdScript = $film('script[type="application/ld+json"]').html();
+    if (jsonLdScript) {
+      const cleanJson = jsonLdScript.replace(/\/\*\s*<!\[CDATA\[\s*\*\/([\s\S]*?)\/\*\s*\]\]>\s*\*\//, '$1').trim();
+      try {
+        const ldData = JSON.parse(cleanJson);
+        if (ldData.name) filmDetails.title = ldData.name;
+        if (ldData.image) filmDetails.poster = ldData.image;
+        if (ldData.description) filmDetails.description = ldData.description;
+        if (ldData.director) {
+          if (Array.isArray(ldData.director)) {
+            filmDetails.director = ldData.director.map(d => d.name).join(', ');
+          } else if (ldData.director.name) {
+            filmDetails.director = ldData.director.name;
+          }
+        }
+        if (ldData.genre) {
+          filmDetails.genre = Array.isArray(ldData.genre) ? ldData.genre : [ldData.genre];
+        }
+      } catch (e) {}
+    }
+
+    if (!filmDetails.poster) {
+      const ogImage = $film('meta[property="og:image"]').attr('content');
+      if (ogImage) filmDetails.poster = ogImage;
+    }
+  } catch (err) {}
+
+  return filmDetails;
+}
+
 app.get('/api/random-movie', async (req, res) => {
   try {
     let { username } = req.query;
@@ -25,144 +129,69 @@ app.get('/api/random-movie', async (req, res) => {
     }
     username = username.trim().toLowerCase();
 
-    // 1. Fetch page 1 of watchlist
-    const watchlistUrl = `https://letterboxd.com/${username}/watchlist/`;
-    let response;
-    try {
-      response = await letterboxdClient.get(watchlistUrl);
-    } catch (err) {
-      if (err.response && err.response.status === 404) {
-        return res.status(404).json({ error: 'User not found or watchlist is private.' });
-      }
-      return res.status(500).json({ error: 'Failed to fetch Letterboxd watchlist.' });
+    const films = await fetchAllWatchlistFilms(username);
+    if (films.length === 0) {
+      return res.status(404).json({ error: 'Nenhum filme encontrado nesta watchlist ou watchlist vazia.' });
     }
 
-    const $ = cheerio.load(response.data);
-
-    // 2. Extract total watchlist count
-    const countText = $('.js-watchlist-count').text().trim();
-    let totalFilms = 0;
-    if (countText) {
-      const match = countText.replace(/,/g, '').match(/(\d+)/);
-      if (match) {
-        totalFilms = parseInt(match[1], 10);
-      }
-    }
-
-    // Fallback: count items on page 1 if count not found
-    const gridItems = [];
-    $('.poster-list li.griditem, li.griditem').each((_, el) => {
-      const comp = $(el).find('.react-component[data-component-class="LazyPoster"]');
-      const itemName = comp.attr('data-item-name');
-      const itemSlug = comp.attr('data-item-slug');
-      const itemLink = comp.attr('data-item-link');
-      if (itemName && itemLink) {
-        gridItems.push({ name: itemName, slug: itemSlug, link: itemLink });
-      }
-    });
-
-    if (totalFilms === 0) {
-      totalFilms = gridItems.length;
-    }
-
-    if (totalFilms === 0) {
-      return res.status(404).json({ error: 'No films found in this watchlist or watchlist is empty.' });
-    }
-
-    // 3. Pick a random index
-    const randomIndex = Math.floor(Math.random() * totalFilms);
-    const page = Math.floor(randomIndex / 28) + 1;
-    const localIndex = randomIndex % 28;
-
-    let selectedFilm = null;
-
-    if (page === 1) {
-      selectedFilm = gridItems[randomIndex];
-    } else {
-      // Fetch specific page
-      const pageUrl = `https://letterboxd.com/${username}/watchlist/page/${page}/`;
-      try {
-        const pageResponse = await letterboxdClient.get(pageUrl);
-        const $page = cheerio.load(pageResponse.data);
-        const pageItems = [];
-        $page('.poster-list li.griditem, li.griditem').each((_, el) => {
-          const comp = $page(el).find('.react-component[data-component-class="LazyPoster"]');
-          const itemName = comp.attr('data-item-name');
-          const itemSlug = comp.attr('data-item-slug');
-          const itemLink = comp.attr('data-item-link');
-          if (itemName && itemLink) {
-            pageItems.push({ name: itemName, slug: itemSlug, link: itemLink });
-          }
-        });
-        selectedFilm = pageItems[localIndex] || pageItems[0] || gridItems[0];
-      } catch (err) {
-        // Fallback to page 1 items if pagination fails
-        selectedFilm = gridItems[randomIndex % gridItems.length];
-      }
-    }
-
-    if (!selectedFilm) {
-      return res.status(500).json({ error: 'Could not select a random film.' });
-    }
-
-    // 4. Fetch film details page for poster and metadata
-    const filmUrl = `https://letterboxd.com${selectedFilm.link}`;
-    let filmDetails = {
-      title: selectedFilm.name,
-      link: filmUrl,
-      poster: null,
-      description: null,
-      director: null,
-      genre: []
-    };
-
-    try {
-      const filmResponse = await letterboxdClient.get(filmUrl);
-      const $film = cheerio.load(filmResponse.data);
-
-      // Extract JSON-LD schema.org data
-      const jsonLdScript = $film('script[type="application/ld+json"]').html();
-      if (jsonLdScript) {
-        // Clean up CDATA if present
-        const cleanJson = jsonLdScript.replace(/\/\*\s*<!\[CDATA\[\s*\*\/([\s\S]*?)\/\*\s*\]\]>\s*\*\//, '$1').trim();
-        try {
-          const ldData = JSON.parse(cleanJson);
-          if (ldData.name) filmDetails.title = ldData.name;
-          if (ldData.image) filmDetails.poster = ldData.image;
-          if (ldData.description) filmDetails.description = ldData.description;
-          if (ldData.director) {
-            if (Array.isArray(ldData.director)) {
-              filmDetails.director = ldData.director.map(d => d.name).join(', ');
-            } else if (ldData.director.name) {
-              filmDetails.director = ldData.director.name;
-            }
-          }
-          if (ldData.genre) {
-            filmDetails.genre = Array.isArray(ldData.genre) ? ldData.genre : [ldData.genre];
-          }
-        } catch (e) {
-          // JSON parse error fallback
-        }
-      }
-
-      // Fallback poster from OpenGraph meta if JSON-LD didn't have image
-      if (!filmDetails.poster) {
-        const ogImage = $film('meta[property="og:image"]').attr('content');
-        if (ogImage) filmDetails.poster = ogImage;
-      }
-    } catch (err) {
-      // If film page fetch fails, we still return the basic info from watchlist
-    }
+    const randomIndex = Math.floor(Math.random() * films.length);
+    const selectedFilm = films[randomIndex];
+    const filmDetails = await fetchFilmDetails(selectedFilm);
 
     return res.json({
       success: true,
-      totalWatchlist: totalFilms,
+      totalWatchlist: films.length,
       movie: filmDetails
     });
 
   } catch (error) {
     console.error('Error in /api/random-movie:', error.message);
-    return res.status(500).json({ error: 'Internal server error while picking random movie.' });
+    const status = error.message.includes('não encontrado') ? 404 : 500;
+    return res.status(status).json({ error: error.message || 'Erro interno ao sortear filme.' });
+  }
+});
+
+// Duo mode endpoint: common movies between user1 and user2
+app.get('/api/common-movie', async (req, res) => {
+  try {
+    let { user1, user2 } = req.query;
+    if (!user1 || !user2) {
+      return res.status(400).json({ error: 'Ambos os usernames são obrigatórios.' });
+    }
+    user1 = user1.trim().toLowerCase();
+    user2 = user2.trim().toLowerCase();
+
+    if (user1 === user2) {
+      return res.status(400).json({ error: 'Por favor, insira dois usernames diferentes.' });
+    }
+
+    // Fetch watchlists for both users in parallel
+    const [films1, films2] = await Promise.all([
+      fetchAllWatchlistFilms(user1),
+      fetchAllWatchlistFilms(user2)
+    ]);
+
+    const user2Slugs = new Set(films2.map(f => f.slug));
+    const commonFilms = films1.filter(f => user2Slugs.has(f.slug));
+
+    if (commonFilms.length === 0) {
+      return res.status(404).json({ error: `Nenhum filme em comum encontrado entre '${user1}' e '${user2}'.` });
+    }
+
+    const randomIndex = Math.floor(Math.random() * commonFilms.length);
+    const selectedFilm = commonFilms[randomIndex];
+    const filmDetails = await fetchFilmDetails(selectedFilm);
+
+    return res.json({
+      success: true,
+      commonCount: commonFilms.length,
+      movie: filmDetails
+    });
+
+  } catch (error) {
+    console.error('Error in /api/common-movie:', error.message);
+    const status = error.message.includes('não encontrado') ? 404 : 500;
+    return res.status(status).json({ error: error.message || 'Erro interno ao buscar filmes em comum.' });
   }
 });
 

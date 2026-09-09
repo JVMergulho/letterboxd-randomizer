@@ -41,7 +41,7 @@
         </h1>
       </div>
       <div class="text-xs text-gray-400 hidden sm:block">
-        Sorteie filmes da sua Watchlist pública
+        Sorteie filmes da sua Watchlist (Individual ou Dupla)
       </div>
     </div>
   </header>
@@ -49,43 +49,94 @@
   <!-- Main Content -->
   <main class="max-w-4xl mx-auto px-4 py-10 flex-grow w-full flex flex-col items-center justify-center">
 
+    <!-- Mode Selector Tabs -->
+    <div class="w-full max-w-xl mb-4 flex rounded-xl bg-letterboxd-dark p-1 border border-letterboxd-border shadow-inner">
+      <button 
+        type="button" 
+        id="tab-solo" 
+        class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center space-x-2 bg-letterboxd-green text-letterboxd-darker shadow cursor-pointer"
+      >
+        <i class="fa-solid fa-user"></i>
+        <span>Modo Individual</span>
+      </button>
+      <button 
+        type="button" 
+        id="tab-duo" 
+        class="flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center space-x-2 text-gray-400 hover:text-white cursor-pointer"
+      >
+        <i class="fa-solid fa-users"></i>
+        <span>Modo Dupla (Em Comum)</span>
+      </button>
+    </div>
+
     <!-- Search Box Card -->
     <div class="bg-letterboxd-card border border-letterboxd-border rounded-xl p-6 sm:p-8 w-full max-w-xl shadow-2xl mb-8">
-      <h2 class="text-lg font-semibold mb-1 text-center text-gray-200">
+      <h2 id="card-title" class="text-lg font-semibold mb-1 text-center text-gray-200">
         Digite seu usuário do Letterboxd
       </h2>
-      <p class="text-xs text-gray-500 text-center mb-4">
-        É o trecho que aparece na URL do seu perfil: letterboxd.com/<span class="text-letterboxd-green">seu-usuario</span>, e não necessariamente o nome exibido no perfil.
+      <p id="card-subtitle" class="text-xs text-gray-500 text-center mb-4">
+        É o trecho que aparece na URL do seu perfil: letterboxd.com/<span class="text-letterboxd-green">seu-usuario</span>
       </p>
-      <form id="randomizer-form" class="flex flex-col sm:flex-row gap-3">
-        <div class="relative flex-grow">
-          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-            <i class="fa-solid fa-user"></i>
+
+      <form id="randomizer-form" class="flex flex-col gap-4">
+        <!-- Solo input -->
+        <div id="solo-fields" class="flex flex-col gap-2">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+              <i class="fa-solid fa-user"></i>
+            </div>
+            <input 
+              type="text" 
+              id="username-input" 
+              placeholder="ex: jvmergulho" 
+              class="w-full pl-11 pr-4 py-3 bg-letterboxd-darker border border-letterboxd-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-letterboxd-green focus:ring-1 focus:ring-letterboxd-green transition-all"
+            >
           </div>
-          <input
-            type="text"
-            id="username-input"
-            placeholder="ex: rockybalboa"
-            required
-            class="w-full pl-11 pr-4 py-3 bg-letterboxd-darker border border-letterboxd-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-letterboxd-green focus:ring-1 focus:ring-letterboxd-green transition-all"
-          >
         </div>
-        <button
-          type="submit"
+
+        <!-- Duo inputs (hidden by default) -->
+        <div id="duo-fields" class="flex flex-col gap-3 hidden">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+              <i class="fa-solid fa-user-1"></i>
+            </div>
+            <input 
+              type="text" 
+              id="user1-input" 
+              placeholder="Seu username (ex: jvmergulho)" 
+              class="w-full pl-11 pr-4 py-3 bg-letterboxd-darker border border-letterboxd-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-letterboxd-green focus:ring-1 focus:ring-letterboxd-green transition-all"
+            >
+          </div>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+              <i class="fa-solid fa-user-2"></i>
+            </div>
+            <input 
+              type="text" 
+              id="user2-input" 
+              placeholder="Username do amigo (ex: amigo)" 
+              class="w-full pl-11 pr-4 py-3 bg-letterboxd-darker border border-letterboxd-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-letterboxd-green focus:ring-1 focus:ring-letterboxd-green transition-all"
+            >
+          </div>
+        </div>
+
+        <button 
+          type="submit" 
           id="submit-btn"
-          class="bg-letterboxd-green hover:bg-[#00c84c] text-letterboxd-darker font-bold px-6 py-3 rounded-lg transition-all flex items-center justify-center space-x-2 shadow-lg hover:shadow-letterboxd-green/20 cursor-pointer"
+          class="bg-letterboxd-green hover:bg-[#00c84c] text-letterboxd-darker font-bold py-3 px-6 rounded-lg transition-all flex items-center justify-center space-x-2 shadow-lg hover:shadow-letterboxd-green/20 cursor-pointer mt-1"
         >
           <span id="btn-text">Sortear Filme</span>
           <i id="btn-icon" class="fa-solid fa-dice"></i>
         </button>
       </form>
+
       <div id="error-message" class="mt-4 p-3 bg-red-900/40 border border-red-700/60 rounded-lg text-red-300 text-sm hidden"></div>
     </div>
 
     <!-- Loading State -->
     <div id="loading-state" class="hidden flex flex-col items-center justify-center py-12">
       <div class="w-12 h-12 border-4 border-letterboxd-border border-t-letterboxd-green rounded-full animate-spin mb-4"></div>
-      <p class="text-gray-400 animate-pulse text-sm">Vasculhando a watchlist e sorteando...</p>
+      <p id="loading-text" class="text-gray-400 animate-pulse text-sm">Vasculhando a watchlist e sorteando...</p>
     </div>
 
     <!-- Result Card -->
@@ -155,13 +206,25 @@
   </footer>
 
   <script>
-    const form = document.getElementById('randomizer-form');
+    let currentMode = 'solo'; // 'solo' or 'duo'
+
+    const tabSolo = document.getElementById('tab-solo');
+    const tabDuo = document.getElementById('tab-duo');
+    const cardTitle = document.getElementById('card-title');
+    const cardSubtitle = document.getElementById('card-subtitle');
+    const soloFields = document.getElementById('solo-fields');
+    const duoFields = document.getElementById('duo-fields');
     const usernameInput = document.getElementById('username-input');
+    const user1Input = document.getElementById('user1-input');
+    const user2Input = document.getElementById('user2-input');
+
+    const form = document.getElementById('randomizer-form');
     const submitBtn = document.getElementById('submit-btn');
     const btnText = document.getElementById('btn-text');
     const btnIcon = document.getElementById('btn-icon');
     const errorMessage = document.getElementById('error-message');
     const loadingState = document.getElementById('loading-state');
+    const loadingText = document.getElementById('loading-text');
     const resultCard = document.getElementById('result-card');
 
     const moviePoster = document.getElementById('movie-poster');
@@ -174,11 +237,42 @@
     const watchlistTotal = document.getElementById('watchlist-total');
     const rerollBtn = document.getElementById('reroll-btn');
 
-    async function fetchRandomMovie() {
-      const username = usernameInput.value.trim();
-      if (!username) return;
+    // Switch modes
+    tabSolo.addEventListener('click', () => {
+      currentMode = 'solo';
+      tabSolo.className = 'flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center space-x-2 bg-letterboxd-green text-letterboxd-darker shadow cursor-pointer';
+      tabDuo.className = 'flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center space-x-2 text-gray-400 hover:text-white cursor-pointer';
+      
+      soloFields.classList.remove('hidden');
+      duoFields.classList.add('hidden');
+      usernameInput.required = true;
+      user1Input.required = false;
+      user2Input.required = false;
 
-      // Reset states
+      cardTitle.textContent = 'Digite seu usuário do Letterboxd';
+      cardSubtitle.innerHTML = `É o trecho que aparece na URL do seu perfil: letterboxd.com/<span class="text-letterboxd-green">seu-usuario</span>`;
+      resultCard.classList.add('hidden');
+      errorMessage.classList.add('hidden');
+    });
+
+    tabDuo.addEventListener('click', () => {
+      currentMode = 'duo';
+      tabDuo.className = 'flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center space-x-2 bg-letterboxd-green text-letterboxd-darker shadow cursor-pointer';
+      tabSolo.className = 'flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center space-x-2 text-gray-400 hover:text-white cursor-pointer';
+      
+      soloFields.classList.add('hidden');
+      duoFields.classList.remove('hidden');
+      usernameInput.required = false;
+      user1Input.required = true;
+      user2Input.required = true;
+
+      cardTitle.textContent = 'Modo Dupla: Filmes em Comum';
+      cardSubtitle.textContent = 'Informe os dois usernames para buscar filmes que ambos querem ver.';
+      resultCard.classList.add('hidden');
+      errorMessage.classList.add('hidden');
+    });
+
+    async function handleRandomize() {
       errorMessage.classList.add('hidden');
       resultCard.classList.add('hidden');
       loadingState.classList.remove('hidden');
@@ -187,16 +281,35 @@
       btnText.textContent = 'Sorteando...';
       btnIcon.className = 'fa-solid fa-spinner fa-spin';
 
+      let url = '';
+      if (currentMode === 'solo') {
+        const username = usernameInput.value.trim();
+        if (!username) return;
+        loadingText.textContent = 'Vasculhando a watchlist e sorteando...';
+        url = `/api/random-movie?username=${encodeURIComponent(username)}`;
+      } else {
+        const user1 = user1Input.value.trim();
+        const user2 = user2Input.value.trim();
+        if (!user1 || !user2) return;
+        loadingText.textContent = 'Buscando watchlists de ambos e cruzando dados...';
+        url = `/api/common-movie?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`;
+      }
+
       try {
-        const res = await fetch(`/api/random-movie?username=${encodeURIComponent(username)}`);
+        const res = await fetch(url);
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || 'Erro ao buscar watchlist.');
+          throw new Error(data.error || 'Erro ao processar sorteio.');
         }
 
         const movie = data.movie;
-        watchlistTotal.textContent = `Watchlist: ${data.totalWatchlist} filmes`;
+        if (currentMode === 'solo') {
+          watchlistTotal.textContent = `Watchlist: ${data.totalWatchlist} filmes`;
+        } else {
+          watchlistTotal.textContent = `Em comum: ${data.commonCount} filmes`;
+        }
+
         movieTitle.textContent = movie.title || 'Filme sem título';
         movieLink.href = movie.link;
 
@@ -247,11 +360,11 @@
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      fetchRandomMovie();
+      handleRandomize();
     });
 
     rerollBtn.addEventListener('click', () => {
-      fetchRandomMovie();
+      handleRandomize();
     });
   </script>
 </body>
