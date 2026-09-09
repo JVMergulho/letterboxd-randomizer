@@ -4,7 +4,7 @@ Cansado de rolar a sua watchlist do [Letterboxd](https://letterboxd.com) sem con
 
 ## Como funciona
 
-1. Você informa o seu username do Letterboxd na interface.
+1. Você informa o seu username do Letterboxd na interface — o trecho que aparece na URL do seu perfil (`letterboxd.com/<username>/`), não necessariamente o nome de exibição do perfil.
 2. O servidor faz scraping da página pública da sua watchlist (`letterboxd.com/<username>/watchlist`) para descobrir quantos filmes ela tem.
 3. Um índice aleatório é sorteado e o filme correspondente é localizado, paginando o scraping quando necessário.
 4. A página do filme sorteado é buscada para extrair pôster, sinopse, diretor e gêneros a partir dos dados `schema.org` (JSON-LD) da própria página.

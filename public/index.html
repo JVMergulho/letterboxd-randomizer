@@ -51,24 +51,27 @@
 
     <!-- Search Box Card -->
     <div class="bg-letterboxd-card border border-letterboxd-border rounded-xl p-6 sm:p-8 w-full max-w-xl shadow-2xl mb-8">
-      <h2 class="text-lg font-semibold mb-4 text-center text-gray-200">
+      <h2 class="text-lg font-semibold mb-1 text-center text-gray-200">
         Digite seu usuário do Letterboxd
       </h2>
+      <p class="text-xs text-gray-500 text-center mb-4">
+        É o trecho que aparece na URL do seu perfil: letterboxd.com/<span class="text-letterboxd-green">seu-usuario</span>, e não necessariamente o nome exibido no perfil.
+      </p>
       <form id="randomizer-form" class="flex flex-col sm:flex-row gap-3">
         <div class="relative flex-grow">
           <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
             <i class="fa-solid fa-user"></i>
           </div>
-          <input 
-            type="text" 
-            id="username-input" 
-            placeholder="ex: rockybalboa" 
+          <input
+            type="text"
+            id="username-input"
+            placeholder="ex: sofislins"
             required
             class="w-full pl-11 pr-4 py-3 bg-letterboxd-darker border border-letterboxd-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-letterboxd-green focus:ring-1 focus:ring-letterboxd-green transition-all"
           >
         </div>
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           id="submit-btn"
           class="bg-letterboxd-green hover:bg-[#00c84c] text-letterboxd-darker font-bold px-6 py-3 rounded-lg transition-all flex items-center justify-center space-x-2 shadow-lg hover:shadow-letterboxd-green/20 cursor-pointer"
         >
