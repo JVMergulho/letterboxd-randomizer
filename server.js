@@ -30,6 +30,11 @@ async function fetchAllWatchlistFilms(username) {
     throw new Error(`Falha ao buscar a watchlist de '${username}'.`);
   }
 
+  // Check for Cloudflare challenge
+  if (response.data && (response.data.includes('Just a moment') || response.data.includes('cf-browser-verification'))) {
+    throw new Error('Letterboxd ativou a proteção anti-bot (Cloudflare). Tente novamente em alguns segundos.');
+  }
+
   const $ = cheerio.load(response.data);
 
   const countText = $('.js-watchlist-count').text().trim();
@@ -60,16 +65,18 @@ async function fetchAllWatchlistFilms(username) {
 
   const totalPages = totalFilms > 0 ? Math.ceil(totalFilms / 28) : Math.ceil(allFilms.size / 28);
 
+  // Fetch pagination sequentially to avoid rate limiting / Cloudflare
   if (totalPages > 1) {
-    const pagePromises = [];
     for (let p = 2; p <= totalPages; p++) {
-      pagePromises.push(
-        letterboxdClient.get(`https://letterboxd.com/${username}/watchlist/page/${p}/`)
-          .then(res => extractFilmsFromHtml(res.data))
-          .catch(() => {})
-      );
+      try {
+        const pageRes = await letterboxdClient.get(`https://letterboxd.com/${username}/watchlist/page/${p}/`);
+        if (pageRes.data && !pageRes.data.includes('Just a moment')) {
+          extractFilmsFromHtml(pageRes.data);
+        }
+      } catch (e) {
+        // Ignore individual page errors
+      }
     }
-    await Promise.all(pagePromises);
   }
 
   return Array.from(allFilms.values());
@@ -165,11 +172,9 @@ app.get('/api/common-movie', async (req, res) => {
       return res.status(400).json({ error: 'Por favor, insira dois usernames diferentes.' });
     }
 
-    // Fetch watchlists for both users in parallel
-    const [films1, films2] = await Promise.all([
-      fetchAllWatchlistFilms(user1),
-      fetchAllWatchlistFilms(user2)
-    ]);
+    // Fetch sequentially to prevent Cloudflare rate-limiting/blocking
+    const films1 = await fetchAllWatchlistFilms(user1);
+    const films2 = await fetchAllWatchlistFilms(user2);
 
     const user2Slugs = new Set(films2.map(f => f.slug));
     const commonFilms = films1.filter(f => user2Slugs.has(f.slug));
